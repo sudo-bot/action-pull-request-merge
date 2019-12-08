@@ -1,0 +1,17 @@
+name: merge pull-request
+on:
+    pull_request:
+        types:
+            - closed
+jobs:
+    merge:
+        runs-on: ubuntu-latest
+        steps:
+            - name: merge pull request
+              uses: sudo-bot/action-pull-request-merge@v1.0.0
+              with:
+                  github-token: ${{ secrets.GITHUB_TOKEN }}
+                  number: ${{ github.event.pull_request.number }}
+                  merge-method: fast-forward
+                  allowed-usernames-regex: ^williamdes$
+                  filter-label: merge-it

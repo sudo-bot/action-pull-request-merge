@@ -1,0 +1,19 @@
+name: Build
+
+on: [push]
+
+jobs:
+    lint-node:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v1
+            - uses: actions/setup-node@v1
+              with:
+                  node-version: 12
+            - name: Cache module
+              uses: actions/cache@v1.0.3
+              with:
+                  path: ~/.npm/
+                  key: npm-cache
+            - name: Install modules
+              run: npm ci

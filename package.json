@@ -1,0 +1,24 @@
+{
+    "name": "action-pull-request-merge",
+    "version": "1.0.0",
+    "description": "Merge a pull-request",
+    "main": "index.js",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/sudo-bot/action-pull-request-merge.git"
+    },
+    "author": {
+        "email": "williamdes@wdes.fr",
+        "name": "William Desportes",
+        "url": "https://william.wdes.fr"
+    },
+    "license": "MPL-2.0",
+    "bugs": {
+        "url": "https://github.com/sudo-bot/action-pull-request-merge/issues"
+    },
+    "homepage": "https://github.com/sudo-bot/action-pull-request-merge#readme",
+    "dependencies": {
+        "@actions/core": "^1.2.0",
+        "@actions/github": "^1.1.0"
+    }
+}
