@@ -42,12 +42,12 @@ const main = async () => {
     }
 
     if (merge_method === 'fast-forward') {
-        core.info('Updating to: ' + pullRequest.data.base.ref + '@' + pullRequest.data.head.sha);
+        core.info('Updating to: ' + 'heads/' + pullRequest.data.base.ref + '@' + pullRequest.data.head.sha);
         await octokit.git.updateRef({
             force: false,
             ...context.repo,
             ...context.owner,
-            ref: 'refs/heads/' + pullRequest.data.base.ref,
+            ref: 'heads/' + pullRequest.data.base.ref,
             sha: pullRequest.data.head.sha,
         });
     } else {
