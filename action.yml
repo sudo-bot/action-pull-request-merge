@@ -1,4 +1,4 @@
-name: "merge pull-request"
+name: "pull-request merge"
 author: williamdes
 description: "merge a pull-request when an event triggers the action"
 inputs:
