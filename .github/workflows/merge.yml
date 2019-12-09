@@ -2,7 +2,7 @@ name: merge pull-request
 on:
     pull_request:
         types:
-            - closed
+            - labeled
 jobs:
     merge:
         runs-on: ubuntu-latest
