@@ -1,6 +1,6 @@
 {
     "name": "action-pull-request-merge",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "Merge a pull-request",
     "main": "index.js",
     "repository": {
