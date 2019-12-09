@@ -17,19 +17,32 @@ const main = async () => {
     if (!context.actor.match(allowed_usernames)) {
         core.warning('Ignored, the username does not match.');
         return;
+    } else {
+        core.info('Username matched.');
     }
+
     const pullRequest = await octokit.pulls.get({
         ...context.repo,
         ...context.owner,
         pull_number: number
     });
 
+    if (pullRequest.data.state === 'closed') {
+        core.warning('Ignored, the pull-request is closed.');
+        return;
+    } else {
+        core.info('The pull-request is open.');
+    }
+
     if (pullRequest.data.labels.indexOf(filter_label) !== -1) {
         core.warning('Ignored, the label does not exist on the pull-request.');
         return;
+    } else {
+        core.info('Label matched.');
     }
 
     if (merge_method === 'fast-forward') {
+        core.info('Updating to: ' + pullRequest.data.base.ref + '@' + pullRequest.data.head.sha);
         await octokit.git.updateRef({
             force: false,
             ...context.repo,
