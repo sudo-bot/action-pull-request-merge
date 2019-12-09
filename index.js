@@ -47,7 +47,7 @@ const main = async () => {
             force: false,
             ...context.repo,
             ...context.owner,
-            ref: pullRequest.data.base.ref,
+            ref: 'refs/heads/' + pullRequest.data.base.ref,
             sha: pullRequest.data.head.sha,
         });
     } else {
