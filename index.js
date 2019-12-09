@@ -69,6 +69,12 @@ const main = async () => {
         }
         await octokit.pulls.merge(mergeData)
     }
+    await octokit.issues.removeLabel({
+        ...context.repo,
+        ...context.owner,
+        issue_number: number,
+        name: filter_label
+    });
 }
 
 main().catch(err => core.setFailed(err.message))
