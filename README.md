@@ -2,7 +2,7 @@
 
 This action merges a pull-request
 
-## Example usage to fast-forward
+## Example usages
 
 ```yml
 steps:
