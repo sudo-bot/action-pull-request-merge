@@ -7,7 +7,7 @@ This action merges a pull-request
 ```yml
 steps:
   - name: merge pull request
-    uses: sudo-bot/action-pull-request-merge@v1.0.2
+    uses: sudo-bot/action-pull-request-merge@v1.0.3
     with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         number: ${{ github.event.pull_request.number }}
@@ -15,7 +15,7 @@ steps:
         filter-label: merge-it
 
   - name: merge pull request with message and body (optional)
-    uses: sudo-bot/action-pull-request-merge@v1.0.2
+    uses: sudo-bot/action-pull-request-merge@v1.0.3
     with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         number: ${{ github.event.pull_request.number }}
@@ -26,7 +26,7 @@ steps:
         merge-message: "Merge #${{ github.event.pull_request.number }}"
 
   - name: merge pull request fast-forward
-    uses: sudo-bot/action-pull-request-merge@v1.0.2
+    uses: sudo-bot/action-pull-request-merge@v1.0.3
     with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         number: ${{ github.event.pull_request.number }}
