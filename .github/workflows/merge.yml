@@ -8,7 +8,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: merge pull request
-              uses: sudo-bot/action-pull-request-merge@v1.0.1
+              uses: sudo-bot/action-pull-request-merge@v1.0.2
               with:
                   github-token: ${{ secrets.GITHUB_TOKEN }}
                   number: ${{ github.event.pull_request.number }}
