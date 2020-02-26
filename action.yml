@@ -17,7 +17,7 @@ inputs:
         required: false
         default: "^.*$"
     filter-label:
-        description: "Tags that will trigger the merge"
+        description: "The label that will trigger the merge"
         required: true
     merge-title:
         description: "The merge title"
