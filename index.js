@@ -4,13 +4,27 @@ const core = require('@actions/core')
 const { GitHub, context } = require('@actions/github')
 
 const main = async () => {
-    const token = core.getInput('github-token');
-    const merge_title = core.getInput('merge-title');
-    const merge_message = core.getInput('merge-message');
-    const number = core.getInput('number');
-    const allowed_usernames = core.getInput('allowed-usernames-regex');
-    const filter_label = core.getInput('filter-label');
-    const merge_method = core.getInput('merge-method');// merge|squash|rebase|fast-forward
+    const token = core.getInput('github-token', {
+        required: true
+    });
+    const merge_title = core.getInput('merge-title', {
+        required: false
+    });
+    const merge_message = core.getInput('merge-message', {
+        required: false
+    });
+    const number = core.getInput('number', {
+        required: true
+    });
+    const allowed_usernames = core.getInput('allowed-usernames-regex', {
+        required: false
+    });
+    const filter_label = core.getInput('filter-label', {
+        required: true
+    });
+    const merge_method = core.getInput('merge-method', {
+        required: false
+    });// merge|squash|rebase|fast-forward
 
     const octokit = new GitHub(token);
 

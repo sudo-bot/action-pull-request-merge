@@ -10,18 +10,22 @@ inputs:
         required: true
     merge-method:
         description: "The merge method: merge,squash,rebase,fast-forward"
+        required: false
         default: "merge"
     allowed-usernames-regex:
         description: "The allowed usernames in javascript regex format"
+        required: false
         default: "^.*$"
     filter-label:
         description: "Tags that will trigger the merge"
         required: true
     merge-title:
         description: "The merge title"
+        required: false
         default: ""
     merge-message:
         description: "The merge message"
+        required: false
         default: ""
 
 branding:
