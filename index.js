@@ -20,7 +20,7 @@ const main = async () => {
         required: false
     });
     const filter_label = core.getInput('filter-label', {
-        required: true
+        required: false
     });
     const merge_method = core.getInput('merge-method', {
         required: false
@@ -48,11 +48,15 @@ const main = async () => {
         core.info('The pull-request is open.');
     }
 
-    if (pullRequest.data.labels.indexOf(filter_label) !== -1) {
-        core.warning('Ignored, the label does not exist on the pull-request.');
-        return;
+    if (filter_label.length > 0) {
+        if (pullRequest.data.labels.indexOf(filter_label) !== -1) {
+            core.warning('Ignored, the label does not exist on the pull-request.');
+            return;
+        } else {
+            core.info('Label matched.');
+        }
     } else {
-        core.info('Label matched.');
+        core.info('Label check is disabled.');
     }
 
     if (merge_method === 'fast-forward') {
@@ -83,12 +87,18 @@ const main = async () => {
         }
         await octokit.pulls.merge(mergeData)
     }
-    await octokit.issues.removeLabel({
-        ...context.repo,
-        ...context.owner,
-        issue_number: number,
-        name: filter_label
-    });
+    if (filter_label.length > 0) {
+        try {
+            await octokit.issues.removeLabel({
+                ...context.repo,
+                ...context.owner,
+                issue_number: number,
+                name: filter_label
+            });
+        } catch (error) {
+            core.warning(error.message || 'Removing the label could have failed.');
+        }
+    }
 }
 
 main().catch(err => core.setFailed(err.message))
