@@ -14,6 +14,13 @@ steps:
         allowed-usernames-regex: ^williamdes$
         filter-label: merge-it
 
+  - name: merge pull request without any need of a label (automatic merge)
+    uses: sudo-bot/action-pull-request-merge@v1.0.3
+    with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        number: ${{ github.event.pull_request.number }}
+        allowed-usernames-regex: ^williamdes$
+
   - name: merge pull request with message and body (optional)
     uses: sudo-bot/action-pull-request-merge@v1.0.3
     with:
