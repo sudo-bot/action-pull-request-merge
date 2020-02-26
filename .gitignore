@@ -2,7 +2,7 @@
 /node_modules/**/*.md
 !/node_modules/**/LICENSE.*
 /node_modules/**/.github
-/node_modules/**/.github
+/node_modules/**/.idea
 /node_modules/**/.travis.yml
 /node_modules/**/.npm*
 /node_modules/**/*.map
