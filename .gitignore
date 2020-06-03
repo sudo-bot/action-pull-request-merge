@@ -3,6 +3,7 @@
 !/node_modules/**/LICENSE.*
 /node_modules/**/.github
 /node_modules/**/.idea
+/node_modules/**/.DS_Store
 /node_modules/**/*.png
 /node_modules/**/*.jpg
 /node_modules/**/.travis.yml
