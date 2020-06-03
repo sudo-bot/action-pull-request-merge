@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [v1.1.1] - 2020-06-03
 
 - Fix label matching rules
+- Upgrade @actions/core from 1.2.3 to 1.2.4
+- Upgrade @actions/github from 2.1.1 to 3.0.0
+- Migrate the code after @actions/github upgrade
 
 ## [v1.1.0] - 2020-02-26 [DEPRECATED]
 
