@@ -49,11 +49,24 @@ const main = async () => {
     }
 
     if (filter_label.length > 0) {
-        if (pullRequest.data.labels.indexOf(filter_label) !== -1) {
+        const regExp = new RegExp(filter_label);
+        const found = pullRequest.data.labels.find(
+            (label) => {
+                return label.name.match(regExp)
+            }
+        );
+
+        if (typeof found === 'object') {
+            if (found.name) {
+                // The label was found and matched the regex
+                core.info('Label matched.');
+            } else {
+                core.error('Error, the label is invalid.');
+                return;
+            }
+        } else {
             core.warning('Ignored, the label does not exist on the pull-request.');
             return;
-        } else {
-            core.info('Label matched.');
         }
     } else {
         core.info('Label check is disabled.');
