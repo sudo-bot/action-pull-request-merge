@@ -75,7 +75,7 @@ const main = async () => {
 
     if (merge_method === 'fast-forward') {
         core.info('Updating to: ' + 'heads/' + pullRequest.data.base.ref + '@' + pullRequest.data.head.sha);
-        await octokit.git.updateRef({
+        await octokit.rest.git.updateRef({
             force: false,
             ...context.repo,
             ...context.owner,
@@ -99,11 +99,11 @@ const main = async () => {
         if (merge_title.trim().length > 0) {
             mergeData.commit_title = merge_title;
         }
-        await octokit.pulls.merge(mergeData)
+        await octokit.rest.pulls.merge(mergeData)
     }
     if (filter_label.length > 0) {
         try {
-            await octokit.issues.removeLabel({
+            await octokit.rest.issues.removeLabel({
                 ...context.repo,
                 ...context.owner,
                 issue_number: number,
