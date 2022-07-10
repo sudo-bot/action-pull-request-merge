@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.2.0] - 2022-07-10
+
+- Upgrade @actions/core from 1.2.6 to 1.9.0
+- Upgrade @actions/github from 3.0.0 to 5.0.3
+- Bump node-fetch from 2.6.0 to 2.6.7
+- Upgrade from node 12 to node 16
+
 ## [v1.1.1] - 2020-06-03
 
 - Fix label matching rules
@@ -36,7 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First stable version
 
-[Unreleased]: https://github.com/sudo-bot/action-pull-request-merge/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/sudo-bot/action-pull-request-merge/compare/v1.2.0...HEAD
+[v1.2.0]: https://github.com/sudo-bot/action-pull-request-merge/compare/v1.1.1...v1.2.0
 [v1.1.1]: https://github.com/sudo-bot/action-pull-request-merge/compare/v1.1.0...v1.1.1
 [v1.1.0]: https://github.com/sudo-bot/action-pull-request-merge/compare/v1.0.3...v1.1.0
 [v1.0.3]: https://github.com/sudo-bot/action-pull-request-merge/compare/v1.0.2...v1.0.3
