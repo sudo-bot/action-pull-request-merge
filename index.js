@@ -1,7 +1,7 @@
 'use strict'
 
-const core = require('@actions/core')
-const { getOctokit, context } = require('@actions/github')
+const core = require('@actions/core');
+const github = require('@actions/github');
 
 const main = async () => {
     const token = core.getInput('github-token', {
@@ -26,7 +26,8 @@ const main = async () => {
         required: false
     });// merge|squash|rebase|fast-forward
 
-    const octokit = getOctokit(token);
+    const octokit = github.getOctokit(token);
+    const context = github.context;
 
     if (!context.actor.match(allowed_usernames)) {
         core.warning('Ignored, the username does not match.');
@@ -35,7 +36,7 @@ const main = async () => {
         core.info('Username matched.');
     }
 
-    const pullRequest = await octokit.pulls.get({
+    const pullRequest = await octokit.rest.pulls.get({
         ...context.repo,
         ...context.owner,
         pull_number: number
