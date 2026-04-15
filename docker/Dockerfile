@@ -33,6 +33,15 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 # `scratch` = no OS, no shell. Just the statically-linked binary and the TLS
 # root store octocrab's rustls-native-certs looks up at runtime.
 FROM scratch
+
+ARG VCS_REF
+ARG BUILD_DATE
+LABEL org.opencontainers.image.source="https://github.com/sudo-bot/action-pull-request-merge" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.title="action-pull-request-merge" \
+      org.opencontainers.image.description="GitHub Action to merge a pull-request"
+
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=build /out/action-pull-request-merge /action-pull-request-merge
 ENTRYPOINT ["/action-pull-request-merge"]

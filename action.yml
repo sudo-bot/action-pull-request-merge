@@ -34,4 +34,4 @@ branding:
     color: blue
 runs:
     using: "docker"
-    image: "Dockerfile"
+    image: "docker://botsudo/action-pull-request-merge:latest"
