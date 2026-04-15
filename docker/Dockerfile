@@ -6,7 +6,7 @@
 FROM rust:1-bookworm AS build
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends musl-tools ca-certificates \
+ && apt-get install -y --no-install-recommends musl-tools ca-certificates binutils \
  && rm -rf /var/lib/apt/lists/* \
  && rustup target add x86_64-unknown-linux-musl
 
@@ -32,13 +32,32 @@ COPY tests ./tests
 
 # Cache only the registry — NOT the target dir — so a changed RUSTFLAGS /
 # cargo config forces a genuine rebuild and we never ship stale artifacts.
+#
+# We pass rustflags via `cargo --config` (highest-priority source) in
+# addition to the .cargo/config.toml above, so even if something shadows
+# the on-disk config, cargo honours the CLI override.
+#
+# Verbose output + readelf diagnostics are intentional: if the binary
+# ever comes out dynamic again, the CI log will show us exactly which
+# source of truth was used and what the ELF actually says.
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    cargo build --release --locked --target x86_64-unknown-linux-musl \
+    echo "--- .cargo/config.toml ---" \
+ && cat .cargo/config.toml \
+ && echo "--- RUSTFLAGS env ---" \
+ && echo "RUSTFLAGS=${RUSTFLAGS}" \
+ && echo "--- cargo build ---" \
+ && cargo build --release --locked --target x86_64-unknown-linux-musl \
+        --config 'target.x86_64-unknown-linux-musl.rustflags=["-C","target-feature=+crt-static"]' \
  && install -D target/x86_64-unknown-linux-musl/release/action-pull-request-merge \
                /out/action-pull-request-merge \
+ && echo "--- file(1) ---" \
  && file /out/action-pull-request-merge \
+ && echo "--- readelf -d (dynamic deps; should be empty for static) ---" \
+ && readelf -d /out/action-pull-request-merge || true \
+ && echo "--- assertions ---" \
  && file /out/action-pull-request-merge | grep -qE "(statically linked|static-pie linked)" \
- && { ! file /out/action-pull-request-merge | grep -q "dynamically linked"; }
+ && { ! file /out/action-pull-request-merge | grep -q "dynamically linked"; } \
+ && { ! readelf -d /out/action-pull-request-merge 2>/dev/null | grep -q "NEEDED"; }
 
 # ---- Runtime stage ---------------------------------------------------------
 # `scratch` = no OS, no shell. Just the statically-linked binary and the TLS
