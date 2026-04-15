@@ -11,9 +11,12 @@ RUN apt-get update \
  && rustup target add x86_64-unknown-linux-musl
 
 # `ring` (pulled in by rustls) has C/asm code; point its build script at the
-# musl cross toolchain so everything links statically.
+# musl cross toolchain so everything links statically. RUSTFLAGS forces the
+# C runtime to be statically linked too, otherwise the produced binary still
+# has a PT_INTERP pointing at /lib/ld-musl-x86_64.so.1 (absent on scratch).
 ENV CC_x86_64_unknown_linux_musl=musl-gcc \
-    CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc
+    CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc \
+    RUSTFLAGS="-C target-feature=+crt-static"
 
 WORKDIR /src
 COPY Cargo.toml Cargo.lock ./
@@ -27,7 +30,9 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/src/target \
     cargo build --release --locked --target x86_64-unknown-linux-musl \
  && install -D target/x86_64-unknown-linux-musl/release/action-pull-request-merge \
-               /out/action-pull-request-merge
+               /out/action-pull-request-merge \
+ && file /out/action-pull-request-merge \
+ && file /out/action-pull-request-merge | grep -q "statically linked"
 
 # ---- Runtime stage ---------------------------------------------------------
 # `scratch` = no OS, no shell. Just the statically-linked binary and the TLS

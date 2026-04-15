@@ -44,23 +44,41 @@ jobs:
             # via `docker run` and only check exit code + stdout. No network
             # calls are needed: the actor-mismatch path short-circuits
             # before any API request.
+            #
+            # Each test captures exit code AND output, prints both to the
+            # CI log, then asserts. If anything is off the log shows
+            # exactly what the binary produced.
+            - name: Smoke test — image inspection
+              run: docker image inspect action-pull-request-merge:ci --format '{{.Os}}/{{.Architecture}} entrypoint={{.Config.Entrypoint}}'
+
             - name: Smoke test — missing input fails with exit 1
               run: |
-                  set -euo pipefail
-                  output=$(docker run --rm action-pull-request-merge:ci 2>&1 && echo __UNEXPECTED_SUCCESS__ || true)
-                  echo "$output"
-                  echo "$output" | grep -q "Input required and not supplied: github-token"
-                  ! echo "$output" | grep -q "__UNEXPECTED_SUCCESS__"
+                  set +e
+                  docker run --rm action-pull-request-merge:ci >/tmp/out 2>&1
+                  code=$?
+                  set -e
+                  echo "=== exit: $code ==="
+                  echo "=== output: ==="
+                  cat /tmp/out
+                  echo "=== end ==="
+                  test "$code" -ne 0
+                  grep -q "Input required and not supplied: github-token" /tmp/out
 
             - name: Smoke test — actor mismatch skips cleanly with exit 0
               run: |
-                  set -euo pipefail
-                  output=$(docker run --rm \
+                  set +e
+                  docker run --rm \
                       -e "INPUT_GITHUB-TOKEN=dummy" \
                       -e "INPUT_NUMBER=1" \
                       -e "INPUT_ALLOWED-USERNAMES-REGEX=^nobody$" \
                       -e "GITHUB_REPOSITORY=octo/widget" \
                       -e "GITHUB_ACTOR=alice" \
-                      action-pull-request-merge:ci 2>&1)
-                  echo "$output"
-                  echo "$output" | grep -q "Ignored, the username does not match"
+                      action-pull-request-merge:ci >/tmp/out 2>&1
+                  code=$?
+                  set -e
+                  echo "=== exit: $code ==="
+                  echo "=== output: ==="
+                  cat /tmp/out
+                  echo "=== end ==="
+                  test "$code" -eq 0
+                  grep -q "Ignored, the username does not match" /tmp/out
