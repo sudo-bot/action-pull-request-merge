@@ -33,5 +33,5 @@ branding:
     icon: "git-pull-request"
     color: blue
 runs:
-    using: "node16"
-    main: "index.js"
+    using: "docker"
+    image: "docker://ghcr.io/sudo-bot/action-pull-request-merge:latest"
