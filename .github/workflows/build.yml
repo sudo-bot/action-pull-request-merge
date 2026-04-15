@@ -38,3 +38,29 @@ jobs:
                   ACTION: load
                   PROGRESS_MODE: plain
                   IMAGE_TAG: action-pull-request-merge:ci
+
+            # ---- Smoke tests on the freshly-built image ------------------
+            # The image is FROM scratch (no shell), so we invoke the binary
+            # via `docker run` and only check exit code + stdout. No network
+            # calls are needed: the actor-mismatch path short-circuits
+            # before any API request.
+            - name: Smoke test — missing input fails with exit 1
+              run: |
+                  set -euo pipefail
+                  output=$(docker run --rm action-pull-request-merge:ci 2>&1 && echo __UNEXPECTED_SUCCESS__ || true)
+                  echo "$output"
+                  echo "$output" | grep -q "Input required and not supplied: github-token"
+                  ! echo "$output" | grep -q "__UNEXPECTED_SUCCESS__"
+
+            - name: Smoke test — actor mismatch skips cleanly with exit 0
+              run: |
+                  set -euo pipefail
+                  output=$(docker run --rm \
+                      -e "INPUT_GITHUB-TOKEN=dummy" \
+                      -e "INPUT_NUMBER=1" \
+                      -e "INPUT_ALLOWED-USERNAMES-REGEX=^nobody$" \
+                      -e "GITHUB_REPOSITORY=octo/widget" \
+                      -e "GITHUB_ACTOR=alice" \
+                      action-pull-request-merge:ci 2>&1)
+                  echo "$output"
+                  echo "$output" | grep -q "Ignored, the username does not match"
