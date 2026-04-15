@@ -32,7 +32,8 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
  && install -D target/x86_64-unknown-linux-musl/release/action-pull-request-merge \
                /out/action-pull-request-merge \
  && file /out/action-pull-request-merge \
- && file /out/action-pull-request-merge | grep -q "statically linked"
+ && file /out/action-pull-request-merge | grep -qE "(statically linked|static-pie linked)" \
+ && { ! file /out/action-pull-request-merge | grep -q "dynamically linked"; }
 
 # ---- Runtime stage ---------------------------------------------------------
 # `scratch` = no OS, no shell. Just the statically-linked binary and the TLS
