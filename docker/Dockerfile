@@ -19,15 +19,20 @@ ENV CC_x86_64_unknown_linux_musl=musl-gcc \
     RUSTFLAGS="-C target-feature=+crt-static"
 
 WORKDIR /src
+
+# Pin per-target rustflags in the project's cargo config so they apply
+# regardless of env-var propagation, cache-mount staleness, or dependency
+# fingerprinting quirks.
+RUN mkdir -p .cargo \
+ && printf '[target.x86_64-unknown-linux-musl]\nrustflags = ["-C", "target-feature=+crt-static"]\n' > .cargo/config.toml
+
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 COPY tests ./tests
 
-# Use BuildKit cache mounts for the registry and the target dir. The target
-# dir is ephemeral when mounted as a cache, so the produced binary is copied
-# out to /out/ before the RUN step ends.
+# Cache only the registry — NOT the target dir — so a changed RUSTFLAGS /
+# cargo config forces a genuine rebuild and we never ship stale artifacts.
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/src/target \
     cargo build --release --locked --target x86_64-unknown-linux-musl \
  && install -D target/x86_64-unknown-linux-musl/release/action-pull-request-merge \
                /out/action-pull-request-merge \
