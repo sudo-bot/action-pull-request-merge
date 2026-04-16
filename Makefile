@@ -23,6 +23,6 @@ docker-build:
 
 update-tags:
 	git checkout main
-	git tag -s -f -a -m "latest series" latest
+	git tag -s -f -a -m "v2" v2
 	git checkout -
-	git push origin refs/tags/latest -f
+	git push origin refs/tags/v2 -f
