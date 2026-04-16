@@ -7,9 +7,10 @@ permissions:
   packages: write
 
 on:
+  workflow_dispatch:
   push:
     tags:
-      - "latest"
+      - "v2"
 
 jobs:
     build-and-publish-action:
