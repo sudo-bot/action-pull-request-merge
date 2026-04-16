@@ -443,13 +443,7 @@ mod tests {
             ) -> Result<()> {
                 Err(anyhow::anyhow!("not a fast-forward"))
             }
-            async fn merge_pull(
-                &self,
-                o: &str,
-                r: &str,
-                n: u64,
-                req: &MergeRequest,
-            ) -> Result<()> {
+            async fn merge_pull(&self, o: &str, r: &str, n: u64, req: &MergeRequest) -> Result<()> {
                 self.0.merge_pull(o, r, n, req).await
             }
             async fn remove_label(&self, o: &str, r: &str, n: u64, l: &str) -> Result<()> {
