@@ -48,8 +48,8 @@ impl MergeRequest {
                 MergeMethod::Merge => "merge",
                 MergeMethod::Squash => "squash",
                 MergeMethod::Rebase => "rebase",
-                // FastForward is handled out-of-band; defensively fall back to merge.
-                MergeMethod::FastForward => "merge",
+                // FastForward / FastForwardOrMerge are handled out-of-band; defensively fall back to merge.
+                MergeMethod::FastForward | MergeMethod::FastForwardOrMerge => "merge",
             },
             sha: head_sha.to_string(),
             commit_title: Some(title.to_string()).filter(|s| !s.trim().is_empty()),

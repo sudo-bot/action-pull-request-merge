@@ -9,7 +9,7 @@ inputs:
         description: "Pull Request number"
         required: true
     merge-method:
-        description: "The merge method: merge,squash,rebase,fast-forward"
+        description: "The merge method: merge,squash,rebase,fast-forward,fast-forward_or_merge"
         required: false
         default: "merge"
     allowed-usernames-regex:

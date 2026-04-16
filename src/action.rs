@@ -91,6 +91,44 @@ pub async fn run<C: GithubClient + ?Sized, L: Logger + ?Sized>(
                 .context("fast-forward update_ref failed")?;
             Outcome::FastForwarded
         }
+        MergeMethod::FastForwardOrMerge => {
+            log.info(&format!(
+                "Attempting fast-forward: heads/{}@{}",
+                pr.base.ref_, pr.head.sha
+            ));
+            match client
+                .update_ref(
+                    &ctx.owner,
+                    &ctx.repo,
+                    &format!("heads/{}", pr.base.ref_),
+                    &pr.head.sha,
+                    false,
+                )
+                .await
+            {
+                Ok(()) => {
+                    log.info("Fast-forward succeeded.");
+                    Outcome::FastForwarded
+                }
+                Err(e) => {
+                    log.warning(&format!(
+                        "Fast-forward failed ({}), falling back to merge.",
+                        e
+                    ));
+                    let req = MergeRequest::from_inputs(
+                        MergeMethod::Merge,
+                        &pr.head.sha,
+                        &inputs.merge_title,
+                        &inputs.merge_message,
+                    );
+                    client
+                        .merge_pull(&ctx.owner, &ctx.repo, inputs.number, &req)
+                        .await
+                        .context("merge request failed (after fast-forward fallback)")?;
+                    Outcome::Merged
+                }
+            }
+        }
         method => {
             let req = MergeRequest::from_inputs(
                 method,
@@ -365,6 +403,76 @@ mod tests {
             ("heads/main".to_string(), "abc123".to_string(), false)
         );
         assert!(client.merge_calls.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn fast_forward_or_merge_succeeds_with_ff() {
+        let client = FakeClient::with_pr(open_pr(&[]));
+        let mut log = CaptureLogger::new();
+        let out = run(
+            &client,
+            &inputs(MergeMethod::FastForwardOrMerge, "^.*$", ""),
+            &ctx(),
+            &mut log,
+        )
+        .await
+        .unwrap();
+        assert_eq!(out, Outcome::FastForwarded);
+
+        let calls = client.update_ref_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert!(client.merge_calls.lock().unwrap().is_empty());
+        assert!(log.contains("Fast-forward succeeded"));
+    }
+
+    #[tokio::test]
+    async fn fast_forward_or_merge_falls_back_to_merge() {
+        struct FailFfClient(FakeClient);
+        #[async_trait]
+        impl GithubClient for FailFfClient {
+            async fn get_pull(&self, o: &str, r: &str, n: u64) -> Result<PullRequest> {
+                self.0.get_pull(o, r, n).await
+            }
+            async fn update_ref(
+                &self,
+                _o: &str,
+                _r: &str,
+                _ref: &str,
+                _sha: &str,
+                _f: bool,
+            ) -> Result<()> {
+                Err(anyhow::anyhow!("not a fast-forward"))
+            }
+            async fn merge_pull(
+                &self,
+                o: &str,
+                r: &str,
+                n: u64,
+                req: &MergeRequest,
+            ) -> Result<()> {
+                self.0.merge_pull(o, r, n, req).await
+            }
+            async fn remove_label(&self, o: &str, r: &str, n: u64, l: &str) -> Result<()> {
+                self.0.remove_label(o, r, n, l).await
+            }
+        }
+
+        let client = FailFfClient(FakeClient::with_pr(open_pr(&[])));
+        let mut log = CaptureLogger::new();
+        let out = run(
+            &client,
+            &inputs(MergeMethod::FastForwardOrMerge, "^.*$", ""),
+            &ctx(),
+            &mut log,
+        )
+        .await
+        .unwrap();
+        assert_eq!(out, Outcome::Merged);
+
+        let merges = client.0.merge_calls.lock().unwrap();
+        assert_eq!(merges.len(), 1);
+        assert_eq!(merges[0].1.merge_method, "merge");
+        assert!(log.contains("falling back to merge"));
     }
 
     #[tokio::test]

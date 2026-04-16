@@ -12,7 +12,7 @@ Marketplace: https://github.com/marketplace/actions/pull-request-merge
 | ------------------------- | :------: | --------- | ----------------------------------------------------------------------------------------------------- |
 | `github-token`            |    yes   | —         | GitHub token used to call the REST API. Usually `${{ secrets.GITHUB_TOKEN }}`.                        |
 | `number`                  |    yes   | —         | Pull-request number to merge.                                                                         |
-| `merge-method`            |    no    | `merge`   | One of `merge`, `squash`, `rebase`, `fast-forward`.                                                   |
+| `merge-method`            |    no    | `merge`   | One of `merge`, `squash`, `rebase`, `fast-forward`, `fast-forward_or_merge`.                          |
 | `allowed-usernames-regex` |    no    | `^.*$`    | Regex the triggering actor (`github.actor`) must match. Skips the merge otherwise.                    |
 | `filter-label`            |    no    | *(empty)* | Regex matched against PR labels. When set, the merge is skipped unless a label matches, and the first matching label is removed after a successful merge. |
 | `merge-title`             |    no    | *(empty)* | Commit title used by the merge/squash/rebase API. Ignored for `fast-forward`.                         |
@@ -25,6 +25,9 @@ Marketplace: https://github.com/marketplace/actions/pull-request-merge
   move the base branch to the PR's head SHA. This is a *true* fast-forward: the
   base ref must already be an ancestor of the head, otherwise GitHub refuses
   the update. No merge commit is created.
+- `fast-forward_or_merge` — attempt a fast-forward first; if the base branch is
+  not an ancestor of the head (i.e. the fast-forward fails), fall back to a
+  regular `merge`.
 
 ## Required permissions
 

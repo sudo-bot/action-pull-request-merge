@@ -73,6 +73,7 @@ pub enum MergeMethod {
     Squash,
     Rebase,
     FastForward,
+    FastForwardOrMerge,
 }
 
 impl MergeMethod {
@@ -82,8 +83,9 @@ impl MergeMethod {
             "squash" => Ok(Self::Squash),
             "rebase" => Ok(Self::Rebase),
             "fast-forward" => Ok(Self::FastForward),
+            "fast-forward_or_merge" => Ok(Self::FastForwardOrMerge),
             other => Err(anyhow!(
-                "invalid merge-method '{}': expected one of merge, squash, rebase, fast-forward",
+                "invalid merge-method '{}': expected one of merge, squash, rebase, fast-forward, fast-forward_or_merge",
                 other
             )),
         }
@@ -227,6 +229,10 @@ mod tests {
         assert_eq!(
             MergeMethod::parse("fast-forward").unwrap(),
             MergeMethod::FastForward
+        );
+        assert_eq!(
+            MergeMethod::parse("fast-forward_or_merge").unwrap(),
+            MergeMethod::FastForwardOrMerge
         );
         assert!(MergeMethod::parse("nope").is_err());
     }
