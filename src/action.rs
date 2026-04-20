@@ -59,18 +59,24 @@ pub async fn run<C: GithubClient + ?Sized, L: Logger + ?Sized>(
     log.info("The pull-request is open.");
 
     // ---- 3. Optional label gate ------------------------------------------
-    if !inputs.filter_label.is_empty() {
+    let matched_label: Option<String> = if !inputs.filter_label.is_empty() {
         let label_re = Regex::new(&inputs.filter_label)
             .with_context(|| format!("invalid filter-label regex: {}", inputs.filter_label))?;
-        let matched = pr.labels.iter().any(|l| label_re.is_match(&l.name));
-        if !matched {
-            log.warning("Ignored, the label does not exist on the pull-request.");
-            return Ok(Outcome::SkippedLabelMissing);
+        let found = pr.labels.iter().find(|l| label_re.is_match(&l.name));
+        match found {
+            Some(l) => {
+                log.info(&format!("Label matched: {}", l.name));
+                Some(l.name.clone())
+            }
+            None => {
+                log.warning("Ignored, the label does not exist on the pull-request.");
+                return Ok(Outcome::SkippedLabelMissing);
+            }
         }
-        log.info("Label matched.");
     } else {
         log.info("Label check is disabled.");
-    }
+        None
+    };
 
     // ---- 4. Perform the merge / fast-forward -----------------------------
     let outcome = match inputs.merge_method {
@@ -145,9 +151,9 @@ pub async fn run<C: GithubClient + ?Sized, L: Logger + ?Sized>(
     };
 
     // ---- 5. Best-effort label cleanup ------------------------------------
-    if !inputs.filter_label.is_empty() {
+    if let Some(label_name) = &matched_label {
         if let Err(e) = client
-            .remove_label(&ctx.owner, &ctx.repo, inputs.number, &inputs.filter_label)
+            .remove_label(&ctx.owner, &ctx.repo, inputs.number, label_name)
             .await
         {
             // Match the original behaviour: warn but do not fail the action.
@@ -502,6 +508,32 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(out, Outcome::Merged);
+
+        // The label removed must be the actual label name, not the regex pattern.
+        let removed = client.remove_label_calls.lock().unwrap();
+        assert_eq!(removed.len(), 1);
+        assert_eq!(removed[0], (7, "release-1.2.3".to_string()));
+    }
+
+    #[tokio::test]
+    async fn label_regex_removes_matched_name_not_pattern() {
+        // When filter-label is an anchored regex like "^merge$", the label
+        // removed after merge must be the literal label "merge", not "^merge$".
+        let client = FakeClient::with_pr(open_pr(&["merge"]));
+        let mut log = CaptureLogger::new();
+        let out = run(
+            &client,
+            &inputs(MergeMethod::Merge, "^.*$", "^merge$"),
+            &ctx(),
+            &mut log,
+        )
+        .await
+        .unwrap();
+        assert_eq!(out, Outcome::Merged);
+
+        let removed = client.remove_label_calls.lock().unwrap();
+        assert_eq!(removed.len(), 1);
+        assert_eq!(removed[0], (7, "merge".to_string()));
     }
 
     #[tokio::test]
