@@ -112,18 +112,17 @@ impl OctocrabClient {
 #[async_trait]
 impl GithubClient for OctocrabClient {
     async fn get_pull(&self, owner: &str, repo: &str, number: u64) -> Result<PullRequest> {
-        // Use the typed pulls API and re-serialise into our minimal shape.
-        let pr = self
+        // Deserialise directly into our minimal projection. Going through
+        // octocrab's typed `pulls().get()` API would force a full GitHub
+        // PullRequest shape (`node_id`, `html_url`, ...) that we don't need
+        // and that some upstreams omit.
+        let url = format!("/repos/{}/{}/pulls/{}", owner, repo, number);
+        let pr: PullRequest = self
             .inner
-            .pulls(owner, repo)
-            .get(number)
+            .get(url, None::<&()>)
             .await
             .with_context(|| format!("failed to fetch pull request #{}", number))?;
-        let value = serde_json::to_value(&pr)?;
-        Ok(
-            serde_json::from_value(value)
-                .context("pull request payload missing expected fields")?,
-        )
+        Ok(pr)
     }
 
     async fn update_ref(
