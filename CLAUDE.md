@@ -154,3 +154,80 @@ Always add or extend a wire test when changing how a request is built.
 - The Cargo edition is `2021`. Async runtime is tokio
   (`#[tokio::main]` in main, `#[tokio::test]` everywhere async is
   needed).
+
+## Sister project: keeping in sync with action-pull-request-lock
+
+This repo shares ~98% of its scaffolding with
+[`sudo-bot/action-pull-request-lock`](https://github.com/sudo-bot/action-pull-request-lock):
+the `GithubClient` trait pattern, env-based context, workflow-command
+logger, fake-client integration tests, `WriteLogger<W>`, the
+`is_gitea` detection rule, `pick_backend`, the `with_env` mutex, the
+Dockerfile shape. **Their git histories are unified** (a single
+`--allow-unrelated-histories` merge sits in the lock-action's log) so
+shared scaffolding work can flow between repositories without manual
+re-implementation.
+
+### Setup
+
+Add the sister repo as a remote:
+
+```sh
+git remote add lock-action git@github.com:sudo-bot/action-pull-request-lock.git
+git fetch lock-action
+```
+
+### Files that should stay identical
+
+Pure scaffolding with no domain content. If they drift, that drift is
+almost always a bug:
+
+- `src/logger.rs`
+
+### Files that should track each other but allow domain divergence
+
+The structure (function signatures, test patterns, error messages)
+should match; the data inside differs:
+
+- `src/context.rs` — same `is_gitea` detection, same `with_env` helper
+  and `ENV_LOCK` mutex. Merge-action additionally has the `actor`
+  field needed by its `allowed-usernames-regex` gate.
+- `src/lib.rs` — both expose `Backend`, `pick_backend`, the same
+  re-exports skeleton. Merge has more `inputs::*` re-exports
+  (`MergeMethod`).
+- `src/main.rs` — identical apart from the package name in `use`.
+- `Cargo.toml` — same dep set apart from `regex` (only merge-action
+  needs it) and package metadata. License is MPL-2.0 in both.
+- `docker/Dockerfile`, `Makefile` — identical apart from the image
+  name.
+
+### Files that are intentionally divergent
+
+Domain-specific. Don't try to keep these aligned beyond high-level
+patterns:
+
+- `src/action.rs`, `src/inputs.rs`,
+  `src/github_client.rs`, `src/gitea_client.rs`,
+  `tests/integration.rs`, `tests/wire.rs`.
+- `action.yml`, `README.md`, `CHANGELOG.md`.
+
+### Workflow
+
+When you write a scaffolding change here:
+
+1. Land it in this repo.
+2. `cd ../action-pull-request-lock && git fetch <this-remote>`.
+3. Cherry-pick the commit (`git cherry-pick <sha>`), or apply by hand
+   if surrounding code has drifted.
+4. Run that repo's `cargo test && cargo clippy && cargo fmt --check`.
+
+When you find drift on a should-be-identical file, reconcile it
+deliberately rather than letting each side mutate.
+
+A useful diff:
+
+```sh
+diff -rq ../action-pull-request-lock/src ./src \
+  | grep -v 'gitea_client\|github_client\|action\.rs\|inputs\.rs'
+```
+
+— anything else flagged is a candidate for sync.
