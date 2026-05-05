@@ -7,7 +7,7 @@ use std::process::ExitCode;
 
 #[tokio::main]
 async fn main() -> ExitCode {
-    let mut log = StdoutLogger;
+    let mut log = StdoutLogger::default();
     let result = run(&mut log).await;
     logger::flush();
     match result {
