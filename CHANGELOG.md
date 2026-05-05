@@ -4,52 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [v2.1.0] - 2026-05-05
+## [v2.0.0] - 2026-05-05
 
-### Added
-- Gitea self-hosted support. The action auto-detects Gitea Actions (via
-  the `GITEA_ACTIONS=true` env var the runner sets, or a `/api/v1` suffix
-  on `GITHUB_API_URL`) and routes API calls through a Gitea-aware client
-  that handles the three places Gitea diverges from GitHub: `POST` (not
-  `PUT`) on `/pulls/{n}/merge` with the CamelCase
-  `Do`/`MergeTitleField`/`MergeMessageField`/`head_commit_id` body, label
-  removal by numeric id (with a name→id lookup), and an empty-body merge
-  response. No new runtime dependency. The existing GitHub path is
-  unchanged.
-- README section documenting Gitea-compatible workflow gates — using
-  `contains(github.event.pull_request.labels.*.name, '...')` instead of
-  `github.event.label.name`, which Gitea does not populate.
-
-### Fixed
-- `remove_label` now percent-encodes the full label name. The previous
-  encoder only handled `%`, space, and `/`, so labels containing `?`,
-  `#`, `&`, `+`, `=`, `:`, or any non-ASCII byte (e.g. `café`, emoji)
-  produced malformed URLs that GitHub would reject. Replaced with an
-  RFC 3986 path-segment encoder that keeps the unreserved set and
-  percent-encodes every other byte.
-- `Cargo.toml`'s `license` field said `MIT` while the actual `LICENSE`
-  file in the repository (and the rest of the `sudo-bot` actions
-  family) is the Mozilla Public License 2.0. Corrected the metadata
-  to match: `license = "MPL-2.0"`. No code change.
-
-### Changed
-- `OctocrabClient::get_pull` now deserialises responses straight into the
-  action's minimal `PullRequest` projection instead of going through
-  octocrab's typed `pulls().get()` API and serde-cycling the result.
-  Same wire request, more resilient to forks that omit optional GitHub
-  fields.
-- `octocrab` upgraded `0.49` → `0.50`.
-
-### Internal
-- Test count grew from 19 to 74. New coverage: `wiremock` integration
-  tests pin HTTP method, URL, headers and body for every endpoint on
-  both clients; the `is_gitea` detection rule extracted to a unit-tested
-  `pick_backend()`; `StdoutLogger` byte-level verification via a
-  `WriteLogger<W: Write>` parameterisation; error-propagation paths,
-  multi-label match semantics, and Gitea label-id resolution edge cases
-  all now have direct tests.
-
-## [v2.0.0] - 2026-04-20
+The `v2` marketplace tag is moving — this entry covers everything in it
+as of today, from the original Rust rewrite (initially released
+2026-04-20) through the Gitea support added 2026-05-05.
 
 ### Changed
 - **Action rewritten in Rust.** The action is now a single Rust binary
@@ -68,8 +27,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bumped to current versions.
 - README rewritten with an inputs table, required permissions block,
   and worked examples for each merge method.
+- `OctocrabClient::get_pull` deserialises responses straight into the
+  action's minimal `PullRequest` projection instead of going through
+  octocrab's typed `pulls().get()` API and serde-cycling the result.
+  Same wire request, more resilient to forks that omit optional GitHub
+  fields.
+- `octocrab` upgraded `0.49` → `0.50`.
 
 ### Added
+- Gitea self-hosted support. The action auto-detects Gitea Actions (via
+  the `GITEA_ACTIONS=true` env var the runner sets, or a `/api/v1` suffix
+  on `GITHUB_API_URL`) and routes API calls through a Gitea-aware client
+  that handles the three places Gitea diverges from GitHub: `POST` (not
+  `PUT`) on `/pulls/{n}/merge` with the CamelCase
+  `Do`/`MergeTitleField`/`MergeMessageField`/`head_commit_id` body, label
+  removal by numeric id (with a name→id lookup), and an empty-body merge
+  response. No new runtime dependency. The existing GitHub path is
+  unchanged.
+- README section documenting Gitea-compatible workflow gates — using
+  `contains(github.event.pull_request.labels.*.name, '...')` instead of
+  `github.event.label.name`, which Gitea does not populate.
 - `fast-forward` merge method. Calls
   `PATCH /repos/{o}/{r}/git/refs/heads/{base}` to advance the base
   branch to the PR's head SHA — a true fast-forward with no merge
@@ -81,9 +58,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is removed, not the regex pattern.
 
 ### Fixed
+- `remove_label` now percent-encodes the full label name. The previous
+  encoder only handled `%`, space, and `/`, so labels containing `?`,
+  `#`, `&`, `+`, `=`, `:`, or any non-ASCII byte (e.g. `café`, emoji)
+  produced malformed URLs that GitHub would reject. Replaced with an
+  RFC 3986 path-segment encoder that keeps the unreserved set and
+  percent-encodes every other byte.
 - Label removal correctly removes the matched label even when
   `filter-label` is a regex (previously the regex string was sent to
   the delete endpoint).
+- `Cargo.toml`'s `license` field said `MIT` while the actual `LICENSE`
+  file in the repository (and the rest of the `sudo-bot` actions
+  family) is the Mozilla Public License 2.0. Corrected the metadata
+  to match: `license = "MPL-2.0"`.
+
+### Internal
+- Test count grew from 19 to 74. New coverage: `wiremock` integration
+  tests pin HTTP method, URL, headers and body for every endpoint on
+  both clients; the `is_gitea` detection rule extracted to a unit-tested
+  `pick_backend()`; `StdoutLogger` byte-level verification via a
+  `WriteLogger<W: Write>` parameterisation; error-propagation paths,
+  multi-label match semantics, and Gitea label-id resolution edge cases
+  all now have direct tests.
 
 ## [v1.2.0] - 2022-07-10
 
@@ -122,7 +118,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First stable version
 
-[v2.1.0]: https://github.com/sudo-bot/action-pull-request-merge/compare/v1.2.0...v2
+[v2.0.0]: https://github.com/sudo-bot/action-pull-request-merge/compare/v1.2.0...v2
 [v1.2.0]: https://github.com/sudo-bot/action-pull-request-merge/compare/v1.1.1...v1.2.0
 [v1.1.1]: https://github.com/sudo-bot/action-pull-request-merge/compare/v1.1.0...v1.1.1
 [v1.1.0]: https://github.com/sudo-bot/action-pull-request-merge/compare/v1.0.3...v1.1.0
