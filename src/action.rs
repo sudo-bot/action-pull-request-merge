@@ -278,6 +278,7 @@ mod tests {
             repo: "widget".into(),
             actor: "alice".into(),
             api_base_url: "https://api.github.com".into(),
+            is_gitea: false,
         }
     }
 

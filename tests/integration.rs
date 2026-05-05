@@ -78,6 +78,7 @@ fn ctx(actor: &str) -> GithubContext {
         repo: "widget".into(),
         actor: actor.into(),
         api_base_url: "https://api.github.com".into(),
+        is_gitea: false,
     }
 }
 

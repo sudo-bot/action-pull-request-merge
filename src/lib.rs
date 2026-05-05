@@ -5,12 +5,14 @@
 
 pub mod action;
 pub mod context;
+pub mod gitea_client;
 pub mod github_client;
 pub mod inputs;
 pub mod logger;
 
 pub use action::{run, Outcome};
 pub use context::GithubContext;
+pub use gitea_client::GiteaClient;
 pub use github_client::{GithubClient, OctocrabClient};
 pub use inputs::{ActionInputs, MergeMethod};
 pub use logger::{Logger, StdoutLogger};
