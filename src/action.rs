@@ -517,6 +517,28 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn label_regex_removes_first_match_only_when_multiple_match() {
+        // The action is documented to remove "the first matching label",
+        // and when several labels match the regex it must remove exactly
+        // one — the first by iteration order — not all of them.
+        let client = FakeClient::with_pr(open_pr(&["release-1.2.3", "release-2.0.0"]));
+        let mut log = CaptureLogger::new();
+        let out = run(
+            &client,
+            &inputs(MergeMethod::Merge, "^.*$", "^release-"),
+            &ctx(),
+            &mut log,
+        )
+        .await
+        .unwrap();
+        assert_eq!(out, Outcome::Merged);
+
+        let removed = client.remove_label_calls.lock().unwrap();
+        assert_eq!(removed.len(), 1, "exactly one label should be removed");
+        assert_eq!(removed[0], (7, "release-1.2.3".to_string()));
+    }
+
+    #[tokio::test]
     async fn label_regex_removes_matched_name_not_pattern() {
         // When filter-label is an anchored regex like "^merge$", the label
         // removed after merge must be the literal label "merge", not "^merge$".
@@ -535,6 +557,96 @@ mod tests {
         let removed = client.remove_label_calls.lock().unwrap();
         assert_eq!(removed.len(), 1);
         assert_eq!(removed[0], (7, "merge".to_string()));
+    }
+
+    #[tokio::test]
+    async fn get_pull_failure_propagates_with_context() {
+        let client = FakeClient::with_pr(open_pr(&[]));
+        *client.get_pull_err.lock().unwrap() = Some("404 Not Found".into());
+        let mut log = CaptureLogger::new();
+        let err = run(
+            &client,
+            &inputs(MergeMethod::Merge, "^.*$", ""),
+            &ctx(),
+            &mut log,
+        )
+        .await
+        .unwrap_err();
+        // The action wraps the underlying error with a user-facing context
+        // string so the failed step explains which step blew up.
+        let chained = format!("{:#}", err);
+        assert!(
+            chained.contains("failed to fetch pull request"),
+            "expected context chain, got: {}",
+            chained
+        );
+        assert!(chained.contains("404 Not Found"));
+    }
+
+    #[tokio::test]
+    async fn invalid_filter_label_regex_is_a_hard_error() {
+        // An unparseable filter-label regex is a misconfiguration, not a
+        // skip — the action should fail loudly so the user fixes it.
+        let client = FakeClient::with_pr(open_pr(&["merge-it"]));
+        let mut log = CaptureLogger::new();
+        let err = run(
+            &client,
+            &inputs(MergeMethod::Merge, "^.*$", "("),
+            &ctx(),
+            &mut log,
+        )
+        .await
+        .unwrap_err()
+        .to_string();
+        assert!(err.contains("filter-label"), "got: {}", err);
+    }
+
+    #[tokio::test]
+    async fn pure_fast_forward_update_ref_failure_is_a_hard_error() {
+        // FastForwardOrMerge falls back; pure FastForward must not — a
+        // failed update_ref there is a real failure, not a silent skip.
+        struct FailUpdateRef(FakeClient);
+        #[async_trait]
+        impl GithubClient for FailUpdateRef {
+            async fn get_pull(&self, o: &str, r: &str, n: u64) -> Result<PullRequest> {
+                self.0.get_pull(o, r, n).await
+            }
+            async fn update_ref(
+                &self,
+                _o: &str,
+                _r: &str,
+                _ref: &str,
+                _sha: &str,
+                _f: bool,
+            ) -> Result<()> {
+                Err(anyhow::anyhow!("not a fast-forward"))
+            }
+            async fn merge_pull(&self, o: &str, r: &str, n: u64, req: &MergeRequest) -> Result<()> {
+                self.0.merge_pull(o, r, n, req).await
+            }
+            async fn remove_label(&self, o: &str, r: &str, n: u64, l: &str) -> Result<()> {
+                self.0.remove_label(o, r, n, l).await
+            }
+        }
+
+        let client = FailUpdateRef(FakeClient::with_pr(open_pr(&[])));
+        let mut log = CaptureLogger::new();
+        let err = run(
+            &client,
+            &inputs(MergeMethod::FastForward, "^.*$", ""),
+            &ctx(),
+            &mut log,
+        )
+        .await
+        .unwrap_err();
+        let chained = format!("{:#}", err);
+        assert!(
+            chained.contains("fast-forward update_ref failed"),
+            "expected context chain, got: {}",
+            chained
+        );
+        // No fallback to a regular merge should have happened.
+        assert!(client.0.merge_calls.lock().unwrap().is_empty());
     }
 
     #[tokio::test]

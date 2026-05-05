@@ -74,6 +74,17 @@ struct GiteaLabel {
     name: String,
 }
 
+/// Look up a label's numeric id by name in a list returned from
+/// `GET /repos/{o}/{r}/issues/{n}/labels`. Extracted as a pure helper so
+/// the not-found path is unit-testable without a live HTTP server.
+fn resolve_label_id(labels: &[GiteaLabel], name: &str, issue_number: u64) -> Result<i64> {
+    labels
+        .iter()
+        .find(|l| l.name == name)
+        .map(|l| l.id)
+        .ok_or_else(|| anyhow!("label '{}' not found on issue #{}", name, issue_number))
+}
+
 #[async_trait]
 impl GithubClient for GiteaClient {
     async fn get_pull(&self, owner: &str, repo: &str, number: u64) -> Result<PullRequest> {
@@ -141,11 +152,7 @@ impl GithubClient for GiteaClient {
             .get(labels_url, None::<&()>)
             .await
             .with_context(|| format!("failed to list labels on issue #{}", issue_number))?;
-        let id = labels
-            .iter()
-            .find(|l| l.name == label)
-            .map(|l| l.id)
-            .ok_or_else(|| anyhow!("label '{}' not found on issue #{}", label, issue_number))?;
+        let id = resolve_label_id(&labels, label, issue_number)?;
         let url = format!(
             "/repos/{}/{}/issues/{}/labels/{}",
             owner, repo, issue_number, id
@@ -312,6 +319,62 @@ mod tests {
         // tower service that registers with the reactor.
         let result = GiteaClient::new("token".into(), "https://gitea.example.com/api/v1");
         assert!(result.is_ok(), "expected build to succeed for valid URL");
+    }
+
+    #[test]
+    fn resolve_label_id_finds_matching_name() {
+        let labels = vec![
+            GiteaLabel {
+                id: 1,
+                name: "bug".into(),
+            },
+            GiteaLabel {
+                id: 42,
+                name: "merge-it".into(),
+            },
+        ];
+        assert_eq!(resolve_label_id(&labels, "merge-it", 7).unwrap(), 42);
+    }
+
+    #[test]
+    fn resolve_label_id_errors_when_name_missing() {
+        // Real failure mode: someone removes the label between our PR fetch
+        // and our label-removal call. We must surface that as a usable error
+        // (not panic, not silently succeed).
+        let labels = vec![GiteaLabel {
+            id: 1,
+            name: "other".into(),
+        }];
+        let err = resolve_label_id(&labels, "merge-it", 7).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("merge-it"),
+            "msg should name the label: {}",
+            msg
+        );
+        assert!(
+            msg.contains("#7"),
+            "msg should name the issue number: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn resolve_label_id_returns_first_match_when_duplicates_exist() {
+        // Gitea allows duplicate label *names* on the same issue when the
+        // issue carries labels from multiple repos. Pick the first by
+        // iteration order — same semantics as the action's label match.
+        let labels = vec![
+            GiteaLabel {
+                id: 10,
+                name: "merge-it".into(),
+            },
+            GiteaLabel {
+                id: 20,
+                name: "merge-it".into(),
+            },
+        ];
+        assert_eq!(resolve_label_id(&labels, "merge-it", 7).unwrap(), 10);
     }
 
     #[test]

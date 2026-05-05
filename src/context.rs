@@ -6,7 +6,6 @@
 
 use anyhow::{anyhow, Context as _, Result};
 use std::env;
-use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
 pub struct GithubContext {
@@ -47,12 +46,6 @@ impl GithubContext {
             api_base_url,
             is_gitea,
         })
-    }
-
-    /// Optional path to the event payload JSON. Not used today but exposed
-    /// for completeness in case future inputs default off it.
-    pub fn event_path() -> Option<PathBuf> {
-        env::var("GITHUB_EVENT_PATH").ok().map(PathBuf::from)
     }
 }
 
