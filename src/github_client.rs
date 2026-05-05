@@ -169,15 +169,12 @@ impl GithubClient for OctocrabClient {
         issue_number: u64,
         label: &str,
     ) -> Result<()> {
-        // The label name must be percent-encoded; do a minimal pass for the
-        // characters likely to show up in label names.
-        let encoded = label
-            .replace('%', "%25")
-            .replace(' ', "%20")
-            .replace('/', "%2F");
         let url = format!(
             "/repos/{}/{}/issues/{}/labels/{}",
-            owner, repo, issue_number, encoded
+            owner,
+            repo,
+            issue_number,
+            encode_path_segment(label),
         );
         let _resp: serde_json::Value = self
             .inner
@@ -186,6 +183,27 @@ impl GithubClient for OctocrabClient {
             .map_err(|e| anyhow!("failed to remove label '{}': {}", label, e))?;
         Ok(())
     }
+}
+
+/// Percent-encode a string for use as a single URL path segment.
+///
+/// Keeps the RFC 3986 *unreserved* set (`A–Z a–z 0–9 - _ . ~`) untouched and
+/// percent-encodes every other byte. This is stricter than what's strictly
+/// required by `pchar`, but it's the safe default — characters like `?`,
+/// `#`, `&`, `+` and `/` would otherwise be interpreted by URL parsers as
+/// query separators, fragment markers, or extra path segments and break the
+/// request.
+fn encode_path_segment(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for byte in s.bytes() {
+        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b'~') {
+            out.push(byte as char);
+        } else {
+            out.push('%');
+            out.push_str(&format!("{:02X}", byte));
+        }
+    }
+    out
 }
 
 #[cfg(test)]
@@ -223,5 +241,39 @@ mod tests {
     fn merge_request_rebase_serialises_correctly() {
         let req = MergeRequest::from_inputs(MergeMethod::Rebase, "sha", "", "");
         assert_eq!(req.merge_method, "rebase");
+    }
+
+    #[test]
+    fn path_segment_keeps_unreserved_characters() {
+        assert_eq!(encode_path_segment("merge-it"), "merge-it");
+        assert_eq!(encode_path_segment("release_v1.2.3"), "release_v1.2.3");
+        assert_eq!(encode_path_segment("a~b"), "a~b");
+        assert_eq!(encode_path_segment(""), "");
+    }
+
+    #[test]
+    fn path_segment_encodes_url_meta_characters() {
+        // The previous implementation only handled `%`, space, and `/`,
+        // which let labels containing `?`, `#`, `&` or `+` smuggle URL
+        // syntax into the path and produce malformed requests.
+        assert_eq!(encode_path_segment("a b"), "a%20b");
+        assert_eq!(encode_path_segment("a/b"), "a%2Fb");
+        assert_eq!(encode_path_segment("a?b"), "a%3Fb");
+        assert_eq!(encode_path_segment("a#b"), "a%23b");
+        assert_eq!(encode_path_segment("a&b"), "a%26b");
+        assert_eq!(encode_path_segment("a+b"), "a%2Bb");
+        assert_eq!(encode_path_segment("50%"), "50%25");
+        assert_eq!(encode_path_segment("a=b"), "a%3Db");
+        assert_eq!(encode_path_segment("a:b"), "a%3Ab");
+    }
+
+    #[test]
+    fn path_segment_encodes_non_ascii_byte_by_byte() {
+        // A label like "café" must encode the multi-byte UTF-8 sequence
+        // for `é` (0xC3 0xA9) as %C3%A9 — anything else produces a request
+        // that GitHub will reject.
+        assert_eq!(encode_path_segment("café"), "caf%C3%A9");
+        // Emoji: 🚀 is 0xF0 0x9F 0x9A 0x80.
+        assert_eq!(encode_path_segment("🚀"), "%F0%9F%9A%80");
     }
 }
