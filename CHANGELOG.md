@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `Cargo.toml`'s `license` field said `MIT` while the actual `LICENSE`
+  file in the repository (and the rest of the `sudo-bot` actions
+  family) is the Mozilla Public License 2.0. Corrected the metadata
+  to match: `license = "MPL-2.0"`. No code change.
+
 ### Added
 - Gitea self-hosted support. The action auto-detects Gitea Actions (via
   the `GITEA_ACTIONS=true` env var the runner sets, or a `/api/v1` suffix

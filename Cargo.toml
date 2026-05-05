@@ -4,7 +4,7 @@ version = "2.0.0"
 edition = "2021"
 authors = ["williamdes"]
 description = "GitHub Action to merge a pull-request, written in Rust"
-license = "MIT"
+license = "MPL-2.0"
 readme = "README.md"
 repository = "https://github.com/sudo-bot/action-pull-request-merge"
 
