@@ -4,13 +4,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-### Fixed
-- `Cargo.toml`'s `license` field said `MIT` while the actual `LICENSE`
-  file in the repository (and the rest of the `sudo-bot` actions
-  family) is the Mozilla Public License 2.0. Corrected the metadata
-  to match: `license = "MPL-2.0"`. No code change.
+## [v2.1.0] - 2026-05-05
 
 ### Added
 - Gitea self-hosted support. The action auto-detects Gitea Actions (via
@@ -33,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   produced malformed URLs that GitHub would reject. Replaced with an
   RFC 3986 path-segment encoder that keeps the unreserved set and
   percent-encodes every other byte.
+- `Cargo.toml`'s `license` field said `MIT` while the actual `LICENSE`
+  file in the repository (and the rest of the `sudo-bot` actions
+  family) is the Mozilla Public License 2.0. Corrected the metadata
+  to match: `license = "MPL-2.0"`. No code change.
 
 ### Changed
 - `OctocrabClient::get_pull` now deserialises responses straight into the
@@ -40,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   octocrab's typed `pulls().get()` API and serde-cycling the result.
   Same wire request, more resilient to forks that omit optional GitHub
   fields.
+- `octocrab` upgraded `0.49` → `0.50`.
 
 ### Internal
 - Test count grew from 19 to 74. New coverage: `wiremock` integration
@@ -123,8 +122,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First stable version
 
-[Unreleased]: https://github.com/sudo-bot/action-pull-request-merge/compare/v2...HEAD
-[v2.0.0]: https://github.com/sudo-bot/action-pull-request-merge/compare/v1.2.0...v2
+[v2.1.0]: https://github.com/sudo-bot/action-pull-request-merge/compare/v1.2.0...v2
 [v1.2.0]: https://github.com/sudo-bot/action-pull-request-merge/compare/v1.1.1...v1.2.0
 [v1.1.1]: https://github.com/sudo-bot/action-pull-request-merge/compare/v1.1.0...v1.1.1
 [v1.1.0]: https://github.com/sudo-bot/action-pull-request-merge/compare/v1.0.3...v1.1.0
