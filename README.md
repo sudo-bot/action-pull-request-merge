@@ -124,7 +124,7 @@ Detection is automatic: when the runner sets `GITEA_ACTIONS=true` (or
 instead of GitHub's. From the workflow author's perspective, the inputs and
 the step usage are identical.
 
-Under the hood, three Gitea-specific differences are handled for you:
+Under the hood, the Gitea-specific differences are handled for you:
 
 - **Merge** — Gitea uses `POST /repos/{o}/{r}/pulls/{n}/merge` (not `PUT`)
   with the `Do` / `MergeTitleField` / `MergeMessageField` / `head_commit_id`
@@ -132,8 +132,13 @@ Under the hood, three Gitea-specific differences are handled for you:
 - **Label removal** — Gitea's `DELETE` endpoint requires the numeric label
   *id*, so the action looks up the issue's labels first and resolves the
   configured name to its id.
-- **Fast-forward** — `PATCH /repos/{o}/{r}/git/refs/{ref}` is wire-compatible
-  with GitHub. Gitea ≥ 1.20 is required.
+- **Fast-forward** — Gitea's `git/refs` API is read-only, so a fast-forward
+  cannot use `PATCH /git/refs/{ref}` the way GitHub does (Gitea responds
+  `405 Method Not Allowed`). The action instead drives the fast-forward
+  through the merge endpoint with `Do: "fast-forward-only"`. **Gitea ≥
+  1.22 is required for `merge-method: fast-forward` and
+  `fast-forward_or_merge`;** plain `merge`, `squash`, and `rebase` work
+  on older Gitea releases.
 
 ### Writing a workflow that runs on both GitHub and Gitea
 

@@ -4,11 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [v2.0.0] - 2026-05-05
+## [v2.0.0] - 2026-05-08
 
 The `v2` marketplace tag is moving — this entry covers everything in it
 as of today, from the original Rust rewrite (initially released
-2026-04-20) through the Gitea support added 2026-05-05.
+2026-04-20) through the Gitea support added 2026-05-05 and the Gitea
+fast-forward fix on 2026-05-08.
 
 ### Changed
 - **Action rewritten in Rust.** The action is now a single Rust binary
@@ -71,6 +72,16 @@ as of today, from the original Rust rewrite (initially released
   file in the repository (and the rest of the `sudo-bot` actions
   family) is the Mozilla Public License 2.0. Corrected the metadata
   to match: `license = "MPL-2.0"`.
+- **Gitea fast-forward.** `merge-method: fast-forward` and the
+  fast-forward leg of `fast-forward_or_merge` were calling `PATCH
+  /repos/{o}/{r}/git/refs/heads/{base}` against Gitea, which returns
+  `405 Method Not Allowed` because Gitea's `git/refs` API is read-only.
+  The action now drives Gitea fast-forwards through the merge endpoint
+  with `Do: "fast-forward-only"` and `head_commit_id` (Gitea ≥ 1.22).
+  GitHub's path is unchanged.
+- Gitea HTTP error messages now include the URL path the action
+  called, so a `405` / `404` from a misconfigured Gitea instance no
+  longer requires reading the action source to diagnose.
 
 ### Internal
 - Test count grew from 19 to 74. New coverage: `wiremock` integration

@@ -86,15 +86,15 @@ pub async fn run<C: GithubClient + ?Sized, L: Logger + ?Sized>(
                 pr.base.ref_, pr.head.sha
             ));
             client
-                .update_ref(
+                .fast_forward(
                     &ctx.owner,
                     &ctx.repo,
-                    &format!("heads/{}", pr.base.ref_),
+                    inputs.number,
+                    &pr.base.ref_,
                     &pr.head.sha,
-                    false,
                 )
                 .await
-                .context("fast-forward update_ref failed")?;
+                .context("fast-forward failed")?;
             Outcome::FastForwarded
         }
         MergeMethod::FastForwardOrMerge => {
@@ -103,12 +103,12 @@ pub async fn run<C: GithubClient + ?Sized, L: Logger + ?Sized>(
                 pr.base.ref_, pr.head.sha
             ));
             match client
-                .update_ref(
+                .fast_forward(
                     &ctx.owner,
                     &ctx.repo,
-                    &format!("heads/{}", pr.base.ref_),
+                    inputs.number,
+                    &pr.base.ref_,
                     &pr.head.sha,
-                    false,
                 )
                 .await
             {
@@ -177,7 +177,7 @@ mod tests {
         pr: Mutex<Option<PullRequest>>,
         get_pull_err: Mutex<Option<String>>,
         merge_calls: Mutex<Vec<(u64, MergeRequest)>>,
-        update_ref_calls: Mutex<Vec<(String, String, bool)>>,
+        fast_forward_calls: Mutex<Vec<(u64, String, String)>>,
         remove_label_calls: Mutex<Vec<(u64, String)>>,
         remove_label_err: Mutex<Option<String>>,
     }
@@ -205,18 +205,19 @@ mod tests {
                 .expect("test forgot to seed PR"))
         }
 
-        async fn update_ref(
+        async fn fast_forward(
             &self,
             _o: &str,
             _r: &str,
-            ref_: &str,
-            sha: &str,
-            force: bool,
+            pr_number: u64,
+            base_ref: &str,
+            head_sha: &str,
         ) -> Result<()> {
-            self.update_ref_calls
-                .lock()
-                .unwrap()
-                .push((ref_.to_string(), sha.to_string(), force));
+            self.fast_forward_calls.lock().unwrap().push((
+                pr_number,
+                base_ref.to_string(),
+                head_sha.to_string(),
+            ));
             Ok(())
         }
 
@@ -390,7 +391,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn fast_forward_calls_update_ref_not_merge() {
+    async fn fast_forward_calls_fast_forward_not_merge() {
         let client = FakeClient::with_pr(open_pr(&[]));
         let mut log = CaptureLogger::new();
         let out = run(
@@ -403,12 +404,9 @@ mod tests {
         .unwrap();
         assert_eq!(out, Outcome::FastForwarded);
 
-        let calls = client.update_ref_calls.lock().unwrap();
+        let calls = client.fast_forward_calls.lock().unwrap();
         assert_eq!(calls.len(), 1);
-        assert_eq!(
-            calls[0],
-            ("heads/main".to_string(), "abc123".to_string(), false)
-        );
+        assert_eq!(calls[0], (7, "main".to_string(), "abc123".to_string()));
         assert!(client.merge_calls.lock().unwrap().is_empty());
     }
 
@@ -426,7 +424,7 @@ mod tests {
         .unwrap();
         assert_eq!(out, Outcome::FastForwarded);
 
-        let calls = client.update_ref_calls.lock().unwrap();
+        let calls = client.fast_forward_calls.lock().unwrap();
         assert_eq!(calls.len(), 1);
         assert!(client.merge_calls.lock().unwrap().is_empty());
         assert!(log.contains("Fast-forward succeeded"));
@@ -440,13 +438,13 @@ mod tests {
             async fn get_pull(&self, o: &str, r: &str, n: u64) -> Result<PullRequest> {
                 self.0.get_pull(o, r, n).await
             }
-            async fn update_ref(
+            async fn fast_forward(
                 &self,
                 _o: &str,
                 _r: &str,
-                _ref: &str,
-                _sha: &str,
-                _f: bool,
+                _n: u64,
+                _base: &str,
+                _head: &str,
             ) -> Result<()> {
                 Err(anyhow::anyhow!("not a fast-forward"))
             }
@@ -602,22 +600,22 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn pure_fast_forward_update_ref_failure_is_a_hard_error() {
+    async fn pure_fast_forward_failure_is_a_hard_error() {
         // FastForwardOrMerge falls back; pure FastForward must not — a
-        // failed update_ref there is a real failure, not a silent skip.
-        struct FailUpdateRef(FakeClient);
+        // failed fast_forward there is a real failure, not a silent skip.
+        struct FailFastForward(FakeClient);
         #[async_trait]
-        impl GithubClient for FailUpdateRef {
+        impl GithubClient for FailFastForward {
             async fn get_pull(&self, o: &str, r: &str, n: u64) -> Result<PullRequest> {
                 self.0.get_pull(o, r, n).await
             }
-            async fn update_ref(
+            async fn fast_forward(
                 &self,
                 _o: &str,
                 _r: &str,
-                _ref: &str,
-                _sha: &str,
-                _f: bool,
+                _n: u64,
+                _base: &str,
+                _head: &str,
             ) -> Result<()> {
                 Err(anyhow::anyhow!("not a fast-forward"))
             }
@@ -629,7 +627,7 @@ mod tests {
             }
         }
 
-        let client = FailUpdateRef(FakeClient::with_pr(open_pr(&[])));
+        let client = FailFastForward(FakeClient::with_pr(open_pr(&[])));
         let mut log = CaptureLogger::new();
         let err = run(
             &client,
@@ -641,7 +639,7 @@ mod tests {
         .unwrap_err();
         let chained = format!("{:#}", err);
         assert!(
-            chained.contains("fast-forward update_ref failed"),
+            chained.contains("fast-forward failed"),
             "expected context chain, got: {}",
             chained
         );
@@ -673,15 +671,15 @@ mod tests {
             async fn get_pull(&self, o: &str, r: &str, n: u64) -> Result<PullRequest> {
                 self.0.get_pull(o, r, n).await
             }
-            async fn update_ref(
+            async fn fast_forward(
                 &self,
                 o: &str,
                 r: &str,
-                ref_: &str,
-                sha: &str,
-                f: bool,
+                n: u64,
+                base: &str,
+                head: &str,
             ) -> Result<()> {
-                self.0.update_ref(o, r, ref_, sha, f).await
+                self.0.fast_forward(o, r, n, base, head).await
             }
             async fn merge_pull(
                 &self,

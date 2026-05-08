@@ -1,6 +1,6 @@
 //! Gitea-specific implementation of [`GithubClient`].
 //!
-//! Gitea's REST API is GitHub-shaped but differs in two places that matter
+//! Gitea's REST API is GitHub-shaped but differs in three places that matter
 //! to this action:
 //!
 //! - Pull-request merge uses `POST` (not `PUT`) and a different body schema:
@@ -9,10 +9,14 @@
 //!   instead of `sha`.
 //! - Issue label removal requires the numeric label *id*, not its name, so
 //!   the issue's labels must be fetched first to map name → id.
+//! - **Fast-forward goes through the merge endpoint, not `git/refs`.**
+//!   Gitea's `git/refs` API is read-only — there is no `PATCH` to move a
+//!   ref to a different commit (it returns `405 Method Not Allowed`).
+//!   The equivalent operation lives on the pull-request merge endpoint
+//!   with `Do: "fast-forward-only"` (Gitea ≥ 1.22).
 //!
-//! The remaining endpoints (`GET /repos/.../pulls/{n}` and
-//! `PATCH /repos/.../git/refs/{ref}`) are wire-compatible with GitHub and
-//! are reused as-is.
+//! The remaining endpoint (`GET /repos/.../pulls/{n}`) is wire-compatible
+//! with GitHub and is reused as-is.
 //!
 //! We piggyback on `octocrab` purely as an authenticated HTTP client. The
 //! `Authorization: token <pat>` header it sets is accepted by Gitea, and we
@@ -98,23 +102,33 @@ impl GithubClient for GiteaClient {
         Ok(pr)
     }
 
-    async fn update_ref(
+    async fn fast_forward(
         &self,
         owner: &str,
         repo: &str,
-        ref_: &str,
-        sha: &str,
-        force: bool,
+        pr_number: u64,
+        _base_ref: &str,
+        head_sha: &str,
     ) -> Result<()> {
-        // PATCH /repos/{o}/{r}/git/refs/{ref} — same shape on both servers.
-        let url = format!("/repos/{}/{}/git/refs/{}", owner, repo, ref_);
-        let body = serde_json::json!({ "sha": sha, "force": force });
+        // Gitea's `git/refs` API is read-only, so we drive the
+        // fast-forward through the pull-request merge endpoint with the
+        // dedicated `Do: "fast-forward-only"` style (Gitea ≥ 1.22).
+        let url = format!("/repos/{}/{}/pulls/{}/merge", owner, repo, pr_number);
+        let body = GiteaMergeBody {
+            do_: "fast-forward-only",
+            merge_title_field: None,
+            merge_message_field: None,
+            head_commit_id: Some(head_sha.to_string()),
+        };
         let resp = self
             .inner
-            ._patch(url, Some(&body))
+            ._post(url.clone(), Some(&body))
             .await
-            .with_context(|| format!("failed to update ref {}", ref_))?;
-        ensure_success(resp.status().as_u16(), "update ref")
+            .with_context(|| format!("failed to fast-forward via POST {}", url))?;
+        ensure_success(
+            resp.status().as_u16(),
+            &format!("fast-forward (POST {})", url),
+        )
     }
 
     async fn merge_pull(
@@ -131,10 +145,13 @@ impl GithubClient for GiteaClient {
         // deserialisation error.
         let resp = self
             .inner
-            ._post(url, Some(&body))
+            ._post(url.clone(), Some(&body))
             .await
-            .with_context(|| format!("failed to merge pull request #{}", number))?;
-        ensure_success(resp.status().as_u16(), "merge pull request")
+            .with_context(|| format!("failed to send merge request to POST {}", url))?;
+        ensure_success(
+            resp.status().as_u16(),
+            &format!("merge pull request (POST {})", url),
+        )
     }
 
     async fn remove_label(

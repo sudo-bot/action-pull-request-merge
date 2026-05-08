@@ -16,7 +16,7 @@ use std::sync::Mutex;
 struct FakeClient {
     pr: Mutex<Option<PullRequest>>,
     merge_calls: Mutex<Vec<MergeRequest>>,
-    update_ref_calls: Mutex<Vec<(String, String)>>,
+    fast_forward_calls: Mutex<Vec<(String, String)>>,
     remove_label_calls: Mutex<Vec<String>>,
 }
 
@@ -25,18 +25,18 @@ impl GithubClient for FakeClient {
     async fn get_pull(&self, _o: &str, _r: &str, _n: u64) -> Result<PullRequest> {
         Ok(self.pr.lock().unwrap().clone().unwrap())
     }
-    async fn update_ref(
+    async fn fast_forward(
         &self,
         _o: &str,
         _r: &str,
-        ref_: &str,
-        sha: &str,
-        _force: bool,
+        _n: u64,
+        base_ref: &str,
+        head_sha: &str,
     ) -> Result<()> {
-        self.update_ref_calls
+        self.fast_forward_calls
             .lock()
             .unwrap()
-            .push((ref_.to_string(), sha.to_string()));
+            .push((base_ref.to_string(), head_sha.to_string()));
         Ok(())
     }
     async fn merge_pull(&self, _o: &str, _r: &str, _n: u64, request: &MergeRequest) -> Result<()> {
@@ -138,9 +138,9 @@ async fn end_to_end_fast_forward_path() {
         .unwrap();
     assert_eq!(out, Outcome::FastForwarded);
 
-    let calls = client.update_ref_calls.lock().unwrap();
+    let calls = client.fast_forward_calls.lock().unwrap();
     assert_eq!(calls.len(), 1);
-    assert_eq!(calls[0].0, "heads/main");
+    assert_eq!(calls[0].0, "main");
     assert_eq!(calls[0].1, "deadbeef");
     assert!(client.merge_calls.lock().unwrap().is_empty());
 }
@@ -163,5 +163,5 @@ async fn end_to_end_disallowed_actor_is_skipped() {
         .unwrap();
     assert_eq!(out, Outcome::SkippedActor);
     assert!(client.merge_calls.lock().unwrap().is_empty());
-    assert!(client.update_ref_calls.lock().unwrap().is_empty());
+    assert!(client.fast_forward_calls.lock().unwrap().is_empty());
 }

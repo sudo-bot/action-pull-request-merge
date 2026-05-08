@@ -78,7 +78,9 @@ async fn github_merge_pull_uses_put_with_merge_method_body() {
 }
 
 #[tokio::test]
-async fn github_update_ref_uses_patch_on_git_refs_path() {
+async fn github_fast_forward_uses_patch_on_git_refs_path() {
+    // GitHub's fast-forward goes through the git/refs API: PATCH the
+    // base branch ref to the new SHA with force:false.
     let server = MockServer::start().await;
     Mock::given(method("PATCH"))
         .and(path("/repos/octo/widget/git/refs/heads/main"))
@@ -94,7 +96,7 @@ async fn github_update_ref_uses_patch_on_git_refs_path() {
 
     let client = OctocrabClient::new("token-abc".into(), &server.uri()).unwrap();
     client
-        .update_ref("octo", "widget", "heads/main", "abc123", false)
+        .fast_forward("octo", "widget", 7, "main", "abc123")
         .await
         .unwrap();
 }
@@ -172,6 +174,13 @@ async fn gitea_merge_pull_surfaces_4xx_as_error() {
         .unwrap_err()
         .to_string();
     assert!(err.contains("422"), "expected 422 in error: {}", err);
+    // The error must name the URL the action actually called, otherwise a
+    // 405 / 404 from a misconfigured Gitea instance is impossible to debug.
+    assert!(
+        err.contains("/repos/octo/widget/pulls/7/merge"),
+        "expected URL path in error for diagnostics: {}",
+        err
+    );
 }
 
 #[tokio::test]
@@ -215,27 +224,55 @@ async fn gitea_remove_label_does_get_then_delete_by_id() {
 }
 
 #[tokio::test]
-async fn gitea_update_ref_uses_patch_with_sha_force_body() {
-    // Wire-compatible with GitHub on the spec, but verify it explicitly
-    // — a regression that used POST/PUT here would still parse.
+async fn gitea_fast_forward_uses_post_on_merge_endpoint_with_fast_forward_only_do() {
+    // Gitea's `git/refs` API is read-only — the fast-forward must go
+    // through the pull-request merge endpoint with `Do: fast-forward-only`,
+    // not the PATCH on `git/refs` that GitHub uses (Gitea returns 405).
     let server = MockServer::start().await;
-    Mock::given(method("PATCH"))
-        .and(path("/repos/octo/widget/git/refs/heads/main"))
+    Mock::given(method("POST"))
+        .and(path("/repos/octo/widget/pulls/7/merge"))
         .and(header_exists("authorization"))
-        .and(body_json(json!({ "sha": "abc123", "force": false })))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-            "ref": "refs/heads/main",
-            "object": { "sha": "abc123" },
+        .and(body_json(json!({
+            "Do": "fast-forward-only",
+            "head_commit_id": "abc123",
         })))
+        .respond_with(ResponseTemplate::new(200))
         .expect(1)
         .mount(&server)
         .await;
 
     let client = GiteaClient::new("token-abc".into(), &server.uri()).unwrap();
     client
-        .update_ref("octo", "widget", "heads/main", "abc123", false)
+        .fast_forward("octo", "widget", 7, "main", "abc123")
         .await
         .unwrap();
+}
+
+#[tokio::test]
+async fn gitea_fast_forward_surfaces_4xx_with_url_in_error() {
+    // When Gitea rejects the fast-forward (e.g. older instance without
+    // `fast-forward-only`, or a non-fast-forwardable head), the error
+    // must include both the status code and the path so the user can
+    // see what the action actually called.
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/repos/octo/widget/pulls/7/merge"))
+        .respond_with(ResponseTemplate::new(405))
+        .mount(&server)
+        .await;
+
+    let client = GiteaClient::new("token-abc".into(), &server.uri()).unwrap();
+    let err = client
+        .fast_forward("octo", "widget", 7, "main", "abc123")
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("405"), "expected 405 in error: {}", err);
+    assert!(
+        err.contains("/repos/octo/widget/pulls/7/merge"),
+        "expected URL path in error for diagnostics: {}",
+        err
+    );
 }
 
 #[tokio::test]

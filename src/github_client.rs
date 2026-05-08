@@ -62,15 +62,25 @@ impl MergeRequest {
 pub trait GithubClient: Send + Sync {
     async fn get_pull(&self, owner: &str, repo: &str, number: u64) -> Result<PullRequest>;
 
-    /// Equivalent to `PATCH /repos/{owner}/{repo}/git/refs/{ref}` with
-    /// `{ "sha": <sha>, "force": false }`. Used for fast-forward merges.
-    async fn update_ref(
+    /// Advance `base_ref` to `head_sha` without creating a merge commit.
+    ///
+    /// The two backends do this on different endpoints:
+    ///
+    /// - **GitHub:** `PATCH /repos/{o}/{r}/git/refs/heads/{base_ref}` with
+    ///   `{ "sha": <head_sha>, "force": false }`. Fails if the base is not
+    ///   an ancestor of the head.
+    /// - **Gitea:** `POST /repos/{o}/{r}/pulls/{n}/merge` with
+    ///   `{ "Do": "fast-forward-only", "head_commit_id": <head_sha> }`.
+    ///   Gitea has no `PATCH` on `/git/refs` (read-only API), so the
+    ///   fast-forward goes through the merge endpoint with the dedicated
+    ///   `Do` value (Gitea ≥ 1.22).
+    async fn fast_forward(
         &self,
         owner: &str,
         repo: &str,
-        ref_: &str,
-        sha: &str,
-        force: bool,
+        pr_number: u64,
+        base_ref: &str,
+        head_sha: &str,
     ) -> Result<()>;
 
     async fn merge_pull(
@@ -125,23 +135,25 @@ impl GithubClient for OctocrabClient {
         Ok(pr)
     }
 
-    async fn update_ref(
+    async fn fast_forward(
         &self,
         owner: &str,
         repo: &str,
-        ref_: &str,
-        sha: &str,
-        force: bool,
+        _pr_number: u64,
+        base_ref: &str,
+        head_sha: &str,
     ) -> Result<()> {
-        // octocrab does not expose a dedicated `update_ref`, so we use the
-        // generic `_patch` helper to call the REST endpoint directly.
-        let url = format!("/repos/{}/{}/git/refs/{}", owner, repo, ref_);
-        let body = serde_json::json!({ "sha": sha, "force": force });
+        // GitHub's git-refs API supports moving a ref to a new commit via
+        // PATCH. `force: false` ensures the move is rejected if it would
+        // not be a true fast-forward (i.e. the base is not an ancestor of
+        // the head), which is exactly the semantics we want.
+        let url = format!("/repos/{}/{}/git/refs/heads/{}", owner, repo, base_ref);
+        let body = serde_json::json!({ "sha": head_sha, "force": false });
         let _resp: serde_json::Value = self
             .inner
             .patch(url, Some(&body))
             .await
-            .with_context(|| format!("failed to update ref {}", ref_))?;
+            .with_context(|| format!("failed to fast-forward heads/{}", base_ref))?;
         Ok(())
     }
 

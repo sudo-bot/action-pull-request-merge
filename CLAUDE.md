@@ -42,10 +42,11 @@ docker/
 `&dyn GithubClient`:
 
 ```
-get_pull   GET    /repos/{o}/{r}/pulls/{n}
-update_ref PATCH  /repos/{o}/{r}/git/refs/{ref}
-merge_pull PUT|POST /repos/{o}/{r}/pulls/{n}/merge
-remove_label DELETE /repos/{o}/{r}/issues/{n}/labels/{name|id}
+get_pull     GET            /repos/{o}/{r}/pulls/{n}
+fast_forward PATCH | POST   /repos/{o}/{r}/git/refs/heads/{base}    (GitHub)
+                            /repos/{o}/{r}/pulls/{n}/merge          (Gitea)
+merge_pull   PUT | POST     /repos/{o}/{r}/pulls/{n}/merge
+remove_label DELETE         /repos/{o}/{r}/issues/{n}/labels/{name|id}
 ```
 
 Two implementations: `OctocrabClient` (GitHub) and `GiteaClient`. Both use
@@ -53,7 +54,7 @@ Two implementations: `OctocrabClient` (GitHub) and `GiteaClient`. Both use
 GitHub helpers from octocrab are *not* used. Selection happens once at
 startup via `pick_backend(&ctx)`.
 
-### Three places Gitea diverges from GitHub
+### Four places Gitea diverges from GitHub
 
 These are the only behavioural differences between the two clients —
 everything else is shared trait + identical wire calls:
@@ -68,14 +69,20 @@ everything else is shared trait + identical wire calls:
    Gitea takes the numeric *id*. `GiteaClient::remove_label` does
    `GET .../issues/{n}/labels` first and resolves name → id via
    `resolve_label_id` (a pure helper kept testable on its own).
+4. **Fast-forward goes through the merge endpoint.** GitHub's
+   `fast_forward` PATCHes `git/refs/heads/{base}` to the head SHA — a
+   true fast-forward with `force: false`. Gitea's `git/refs` API is
+   read-only (PATCH there returns `405 Method Not Allowed`), so
+   `GiteaClient::fast_forward` POSTs to `/pulls/{n}/merge` with
+   `Do: "fast-forward-only"` and `head_commit_id`. Requires Gitea ≥ 1.22.
 
-`update_ref` and `get_pull` are wire-compatible across both forges.
+`get_pull` is wire-compatible across both forges.
 
 ## Build / test / lint
 
 ```sh
 cargo build --release          # what the Dockerfile runs
-cargo test                     # 74 tests across unit + integration + wire
+cargo test                     # 76 tests across unit + integration + wire
 cargo fmt --check              # style
 cargo clippy --all-targets -- -D warnings   # lints
 make docker-build              # local image build (linux/amd64 by default)
