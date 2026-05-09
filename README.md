@@ -135,10 +135,18 @@ Under the hood, the Gitea-specific differences are handled for you:
 - **Fast-forward** — Gitea's `git/refs` API is read-only, so a fast-forward
   cannot use `PATCH /git/refs/{ref}` the way GitHub does (Gitea responds
   `405 Method Not Allowed`). The action instead drives the fast-forward
-  through the merge endpoint with `Do: "fast-forward-only"`. **Gitea ≥
-  1.22 is required for `merge-method: fast-forward` and
-  `fast-forward_or_merge`;** plain `merge`, `squash`, and `rebase` work
-  on older Gitea releases.
+  through the merge endpoint with `Do: "fast-forward-only"`, which
+  landed in **Gitea 1.22**.
+
+  Version requirements by `merge-method`:
+
+  | merge-method            | Gitea ≥ 1.22 | Gitea < 1.22                                                    |
+  | ----------------------- | :----------: | --------------------------------------------------------------- |
+  | `merge`                 |      ✓       | ✓ (any Gitea ≥ 1.17)                                            |
+  | `squash`                |      ✓       | ✓                                                               |
+  | `rebase`                |      ✓       | ✓                                                               |
+  | `fast-forward_or_merge` |      ✓       | ✓ — FF attempt 422s on the unknown `Do` value, then falls back. |
+  | `fast-forward`          |      ✓       | ✗ — hard-fails. Use `fast-forward_or_merge`, or upgrade Gitea.  |
 
 ### Writing a workflow that runs on both GitHub and Gitea
 

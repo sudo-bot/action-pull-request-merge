@@ -77,8 +77,11 @@ fast-forward fix on 2026-05-08.
   /repos/{o}/{r}/git/refs/heads/{base}` against Gitea, which returns
   `405 Method Not Allowed` because Gitea's `git/refs` API is read-only.
   The action now drives Gitea fast-forwards through the merge endpoint
-  with `Do: "fast-forward-only"` and `head_commit_id` (Gitea ≥ 1.22).
-  GitHub's path is unchanged.
+  with `Do: "fast-forward-only"` and `head_commit_id`. **Gitea ≥ 1.22**
+  is required for the FF path; on older Gitea, `fast-forward_or_merge`
+  still works because the unknown-`Do` 422 falls through to a plain
+  merge — pure `fast-forward` hard-fails (no equivalent operation
+  exists on the older API). GitHub's path is unchanged.
 - Gitea HTTP error messages now include the URL path the action
   called, so a `405` / `404` from a misconfigured Gitea instance no
   longer requires reading the action source to diagnose.
