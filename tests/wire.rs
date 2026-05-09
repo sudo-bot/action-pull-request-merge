@@ -9,8 +9,12 @@
 //! These tests stand up an in-process [`wiremock`] server, point each
 //! client at it, and assert on the request shape.
 
+use action_pull_request_merge::action::{run, Outcome};
+use action_pull_request_merge::context::GithubContext;
 use action_pull_request_merge::gitea_client::GiteaClient;
 use action_pull_request_merge::github_client::{MergeRequest, OctocrabClient};
+use action_pull_request_merge::inputs::ActionInputs;
+use action_pull_request_merge::logger::CaptureLogger;
 use action_pull_request_merge::{GithubClient, MergeMethod};
 use serde_json::{json, Value};
 use wiremock::matchers::{body_json, header_exists, method, path};
@@ -273,6 +277,86 @@ async fn gitea_fast_forward_surfaces_4xx_with_url_in_error() {
         "expected URL path in error for diagnostics: {}",
         err
     );
+}
+
+#[tokio::test]
+async fn fast_forward_or_merge_on_older_gitea_falls_back_to_plain_merge() {
+    // End-to-end check that the action's `fast-forward_or_merge` mode works
+    // on Gitea < 1.22 (which doesn't recognise `Do: "fast-forward-only"`).
+    //
+    // Newer Gitea: 1 HTTP call (FF succeeds, covered by another test).
+    // Older Gitea: 2 HTTP calls — FF returns 422 with an "unknown Do" error,
+    // and the action falls back to a plain `Do: "merge"` POST.
+    //
+    // wiremock matches mocks in mount-order; the FF-only mock (with the
+    // specific body matcher) goes first so it captures the FF attempt,
+    // and the broader "Do:merge" mock captures the fallback.
+    let server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/repos/octo/widget/pulls/7"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "state": "open",
+            "head": { "ref": "topic", "sha": "abc123" },
+            "base": { "ref": "main", "sha": "def456" },
+            "labels": [],
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    Mock::given(method("POST"))
+        .and(path("/repos/octo/widget/pulls/7/merge"))
+        .and(body_json(json!({
+            "Do": "fast-forward-only",
+            "head_commit_id": "abc123",
+        })))
+        .respond_with(ResponseTemplate::new(422).set_body_json(json!({
+            "message": "Do: must be one of [merge rebase rebase-merge squash manually-merged head-only base-only]",
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    Mock::given(method("POST"))
+        .and(path("/repos/octo/widget/pulls/7/merge"))
+        .and(body_json(json!({
+            "Do": "merge",
+            "head_commit_id": "abc123",
+        })))
+        .respond_with(ResponseTemplate::new(200))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let client = GiteaClient::new("token-abc".into(), &server.uri()).unwrap();
+    let inputs = ActionInputs {
+        github_token: "token-abc".into(),
+        number: 7,
+        merge_method: MergeMethod::FastForwardOrMerge,
+        allowed_usernames_regex: ".*".into(),
+        filter_label: "".into(),
+        merge_title: "".into(),
+        merge_message: "".into(),
+    };
+    let ctx = GithubContext {
+        owner: "octo".into(),
+        repo: "widget".into(),
+        actor: "alice".into(),
+        api_base_url: server.uri(),
+        is_gitea: true,
+    };
+    let mut log = CaptureLogger::new();
+    let outcome = run(&client, &inputs, &ctx, &mut log).await.unwrap();
+
+    assert_eq!(outcome, Outcome::Merged);
+    assert!(
+        log.contains("falling back to merge"),
+        "expected the warning that drives the fallback, got: {:?}",
+        log
+    );
+    // wiremock's `.expect(N)` assertions fire on Drop, so MockServer's drop
+    // here will panic if either mock was hit the wrong number of times.
 }
 
 #[tokio::test]

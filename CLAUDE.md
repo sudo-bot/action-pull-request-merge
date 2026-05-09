@@ -82,7 +82,7 @@ everything else is shared trait + identical wire calls:
 
 ```sh
 cargo build --release          # what the Dockerfile runs
-cargo test                     # 76 tests across unit + integration + wire
+cargo test                     # 77 tests across unit + integration + wire
 cargo fmt --check              # style
 cargo clippy --all-targets -- -D warnings   # lints
 make docker-build              # local image build (linux/amd64 by default)
