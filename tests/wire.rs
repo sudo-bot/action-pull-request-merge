@@ -185,6 +185,14 @@ async fn gitea_merge_pull_surfaces_4xx_as_error() {
         "expected URL path in error for diagnostics: {}",
         err
     );
+    // Gitea's response body contains a `message` field with the actual
+    // reason (e.g. "merge style is not allowed"). It must surface in the
+    // error so the user doesn't need to guess.
+    assert!(
+        err.contains("Pull request is not mergeable"),
+        "expected Gitea's error message in output: {}",
+        err
+    );
 }
 
 #[tokio::test]
@@ -254,14 +262,15 @@ async fn gitea_fast_forward_uses_post_on_merge_endpoint_with_fast_forward_only_d
 
 #[tokio::test]
 async fn gitea_fast_forward_surfaces_4xx_with_url_in_error() {
-    // When Gitea rejects the fast-forward (e.g. older instance without
-    // `fast-forward-only`, or a non-fast-forwardable head), the error
-    // must include both the status code and the path so the user can
-    // see what the action actually called.
+    // When Gitea rejects the fast-forward (e.g. the merge style is
+    // disabled in repo settings), the error must include the status code,
+    // the path, AND Gitea's error message from the response body.
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path("/repos/octo/widget/pulls/7/merge"))
-        .respond_with(ResponseTemplate::new(405))
+        .respond_with(ResponseTemplate::new(405).set_body_json(json!({
+            "message": "merge style 'fast-forward-only' is not allowed for this repository",
+        })))
         .mount(&server)
         .await;
 
@@ -275,6 +284,11 @@ async fn gitea_fast_forward_surfaces_4xx_with_url_in_error() {
     assert!(
         err.contains("/repos/octo/widget/pulls/7/merge"),
         "expected URL path in error for diagnostics: {}",
+        err
+    );
+    assert!(
+        err.contains("is not allowed for this repository"),
+        "expected Gitea's error message in output: {}",
         err
     );
 }

@@ -125,10 +125,22 @@ impl GithubClient for GiteaClient {
             ._post(url.clone(), Some(&body))
             .await
             .with_context(|| format!("failed to fast-forward via POST {}", url))?;
-        ensure_success(
-            resp.status().as_u16(),
-            &format!("fast-forward (POST {})", url),
-        )
+        let status = resp.status().as_u16();
+        if (200..300).contains(&status) {
+            return Ok(());
+        }
+        let detail = self
+            .inner
+            .body_to_string(resp)
+            .await
+            .map(|b| extract_message(&b))
+            .unwrap_or_default();
+        Err(anyhow!(
+            "Gitea fast-forward (POST {}) returned HTTP {}: {}",
+            url,
+            status,
+            detail
+        ))
     }
 
     async fn merge_pull(
@@ -148,10 +160,22 @@ impl GithubClient for GiteaClient {
             ._post(url.clone(), Some(&body))
             .await
             .with_context(|| format!("failed to send merge request to POST {}", url))?;
-        ensure_success(
-            resp.status().as_u16(),
-            &format!("merge pull request (POST {})", url),
-        )
+        let status = resp.status().as_u16();
+        if (200..300).contains(&status) {
+            return Ok(());
+        }
+        let detail = self
+            .inner
+            .body_to_string(resp)
+            .await
+            .map(|b| extract_message(&b))
+            .unwrap_or_default();
+        Err(anyhow!(
+            "Gitea merge pull request (POST {}) returned HTTP {}: {}",
+            url,
+            status,
+            detail
+        ))
     }
 
     async fn remove_label(
@@ -181,6 +205,15 @@ impl GithubClient for GiteaClient {
             .map_err(|e| anyhow!("failed to remove label '{}': {}", label, e))?;
         ensure_success(resp.status().as_u16(), "remove label")
     }
+}
+
+/// Parse Gitea's `{ "message": "..." }` JSON envelope, falling back to
+/// the raw body string if it's not JSON.
+fn extract_message(body: &str) -> String {
+    serde_json::from_str::<serde_json::Value>(body)
+        .ok()
+        .and_then(|v| v.get("message").and_then(|m| m.as_str()).map(String::from))
+        .unwrap_or_else(|| body.to_string())
 }
 
 fn ensure_success(status: u16, what: &str) -> Result<()> {
@@ -465,5 +498,26 @@ mod tests {
         assert_eq!(pr.labels.len(), 2);
         assert_eq!(pr.labels[0].name, "merge-it");
         assert_eq!(pr.labels[1].name, "release");
+    }
+
+    #[test]
+    fn extract_message_gets_json_message_field() {
+        let body = r#"{"message":"merge style 'merge' is not allowed for this repository"}"#;
+        assert_eq!(
+            extract_message(body),
+            "merge style 'merge' is not allowed for this repository"
+        );
+    }
+
+    #[test]
+    fn extract_message_falls_back_to_raw_body_for_non_json() {
+        assert_eq!(extract_message("Not Found"), "Not Found");
+    }
+
+    #[test]
+    fn extract_message_falls_back_when_no_message_field() {
+        let body = r#"{"error":"something"}"#;
+        // No `message` key — returns the raw body.
+        assert_eq!(extract_message(body), body);
     }
 }
